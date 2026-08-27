@@ -1315,44 +1315,67 @@ function createTempAuthClient() {
 }
 
 async function loadData() {
-  // Returns { data: object|null, source: 'supabase'|'supabaseEmpty'|'localStorage'|'unavailable' }
+  // Returns { data: object|null, source: 'supabase'|'supabaseEmpty'|'localStorage'|'unavailable', updatedAt: string|null }
   // 'supabaseEmpty' = Supabase confirmed the row is brand new/empty → safe to show bootstrap
   // 'unavailable'   = Supabase blocked/timed out AND no localStorage → do NOT show bootstrap
   try {
     const supabaseResult = await Promise.race([
-      supabase.from("content_os_data").select("data").eq("id", 1).maybeSingle()
+      supabase.from("content_os_data").select("data,updated_at").eq("id", 1).maybeSingle()
         .then(({ data, error }) => ({ data, error, ok: !error })),
       new Promise(resolve => setTimeout(() => resolve({ ok: false }), 6000))
     ]);
     if (supabaseResult.ok) {
       const row = supabaseResult.data;
       if (row && row.data && Object.keys(row.data).length > 0) {
-        return { data: row.data, source: 'supabase' };
+        return { data: row.data, source: 'supabase', updatedAt: row.updated_at || null };
       }
       // Supabase responded but row is empty/missing — bootstrap is safe
       // Still check localStorage in case admin is on same device
       try {
         const ls = localStorage.getItem("cos_v8");
-        if (ls) return { data: JSON.parse(ls), source: 'localStorage' };
+        if (ls) return { data: JSON.parse(ls), source: 'localStorage', updatedAt: row?.updated_at || null };
       } catch(e) {}
-      return { data: null, source: 'supabaseEmpty' };
+      return { data: null, source: 'supabaseEmpty', updatedAt: row?.updated_at || null };
     }
   } catch(e) { console.warn("Supabase load error:", e.code || e.message); }
   // Supabase failed (RLS denied, timeout, or network error)
   try {
     const ls = localStorage.getItem("cos_v8");
-    if (ls) return { data: JSON.parse(ls), source: 'localStorage' };
+    if (ls) return { data: JSON.parse(ls), source: 'localStorage', updatedAt: null };
   } catch(e) {}
-  return { data: null, source: 'unavailable' };
+  return { data: null, source: 'unavailable', updatedAt: null };
 }
 
-function saveData(plan) {
+// Conditional save: only overwrites the row if nobody else has changed it since
+// we last loaded it (compares updated_at). Prevents a stale tab/device from
+// silently clobbering a fresher reset/edit made elsewhere.
+// Returns { ok, conflict, updatedAt }.
+async function saveData(plan, expectedUpdatedAt) {
+  const nowIso = new Date().toISOString();
+  try { localStorage.setItem("cos_v8", JSON.stringify(plan)); } catch(e) {}
   try {
-    localStorage.setItem("cos_v8", JSON.stringify(plan));
-    supabase.from("content_os_data")
-      .upsert({ id: 1, data: plan, updated_at: new Date().toISOString() })
-      .then(({ error }) => { if (error) console.error("Supabase Sync Error:", error); });
-  } catch (e) { console.error("Supabase Sync Error:", e); }
+    if (expectedUpdatedAt) {
+      const { data, error } = await supabase
+        .from("content_os_data")
+        .update({ data: plan, updated_at: nowIso })
+        .eq("id", 1)
+        .eq("updated_at", expectedUpdatedAt)
+        .select("updated_at");
+      if (error) { console.error("Supabase Sync Error:", error); return { ok:false, conflict:false, updatedAt: expectedUpdatedAt }; }
+      if (!data || data.length === 0) {
+        console.warn("Supabase save conflict: server has newer data than this session.");
+        return { ok:false, conflict:true, updatedAt: expectedUpdatedAt };
+      }
+      return { ok:true, conflict:false, updatedAt: nowIso };
+    } else {
+      const { error } = await supabase.from("content_os_data").upsert({ id:1, data:plan, updated_at: nowIso });
+      if (error) { console.error("Supabase Sync Error:", error); return { ok:false, conflict:false, updatedAt: null }; }
+      return { ok:true, conflict:false, updatedAt: nowIso };
+    }
+  } catch (e) {
+    console.error("Supabase Sync Error:", e);
+    return { ok:false, conflict:false, updatedAt: expectedUpdatedAt || null };
+  }
 }
 // ══════════════ RAW METRICS / KPI ARCHITECTURE (Phase 7) ══════════════
 // Raw Metrics are first-class source values; KPIs reference them via input.metricId. Legacy input.id/label remains supported.
@@ -7267,6 +7290,7 @@ function App(){
   const [plan,setPlan]=useState({});
   const [planLoaded, setPlanLoaded] = useState(false);
   const [dbConfirmedEmpty, setDbConfirmedEmpty] = useState(null); // null=unknown, true=DB empty, false=inaccessible
+  const dataUpdatedAtRef = useRef(null); // last-known Supabase updated_at — used for conflict-safe saves
   const [autosave, setAutosave] = useState("saved");
   const [showCmd, setShowCmd] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
@@ -7283,8 +7307,9 @@ function App(){
       if (!sbUser) {
         // Not signed in — load plan to check bootstrap state
         if (!planCache) {
-          const { data: d, source } = await loadData();
+          const { data: d, source, updatedAt } = await loadData();
           planCache = (d && Object.keys(d).length > 0) ? ensureDefaults(d) : {};
+          dataUpdatedAtRef.current = updatedAt || null;
           setPlan(planCache);
           // Determine if Supabase confirmed DB is empty (safe to bootstrap)
           // vs Supabase was inaccessible (don't show bootstrap — data may exist)
@@ -7299,10 +7324,13 @@ function App(){
 
       // Signed in via Supabase Auth — load plan and find profile
       try {
-        const { data: d } = await loadData();
+        const { data: d, updatedAt } = await loadData();
+        dataUpdatedAtRef.current = updatedAt || null;
         const rawPlan = (d && Object.keys(d).length > 0) ? d : {};
         planCache = ensureDefaults(rawPlan);
-        if(planCache!==rawPlan) saveData(planCache); // persist newly-seeded defaults
+        if(planCache!==rawPlan) { // persist newly-seeded defaults
+          saveData(planCache, dataUpdatedAtRef.current).then(r=>{ if(r?.ok) dataUpdatedAtRef.current=r.updatedAt; });
+        }
         setPlan(planCache);
         const users = planCache._users || [];
         // Match by authUid first, then by email (for legacy / first-time)
@@ -7315,7 +7343,7 @@ function App(){
             const updated = users.map(u => u.id === profile.id ? profile : u);
             const newPlan = {...planCache, _users: updated};
             setPlan(newPlan);
-            saveData(newPlan);
+            saveData(newPlan, dataUpdatedAtRef.current).then(r=>{ if(r?.ok) dataUpdatedAtRef.current=r.updatedAt; });
           }
           setUser(profile);
           // Set presence
@@ -7381,10 +7409,27 @@ function App(){
     }catch(e){ updatedPlan={...updatedPlan,_permissionsSchemaVersion:PERMISSIONS_SCHEMA_VERSION,_auditSchemaVersion:AUDIT_SCHEMA_VERSION}; }
     setPlan(updatedPlan);
     if (isDemo) return true; // demo mode is fully in-memory — never touches Supabase/localStorage
-    saveData(updatedPlan);
     setAutosave("saving");
     clearTimeout(COSRuntime.saveTm);
-    COSRuntime.saveTm=setTimeout(()=>setAutosave("saved"),800);
+    saveData(updatedPlan, dataUpdatedAtRef.current).then(r=>{
+      if (r?.ok) {
+        dataUpdatedAtRef.current = r.updatedAt;
+        setAutosave("saved");
+      } else if (r?.conflict) {
+        // Another device/tab saved more recently — do NOT keep retrying with stale data.
+        // Re-fetch the true current server state so this session doesn't overwrite it blindly.
+        setAutosave("conflict");
+        show("⚠️ تم تعديل البيانات من جهاز آخر في نفس الوقت — جاري تحميل أحدث نسخة");
+        loadData().then(({data:d, updatedAt})=>{
+          const fresh = (d && Object.keys(d).length>0) ? ensureDefaults(d) : {};
+          dataUpdatedAtRef.current = updatedAt || null;
+          setPlan(fresh);
+          setAutosave("saved");
+        });
+      } else {
+        setAutosave("saved");
+      }
+    });
     return true;
   }
 
