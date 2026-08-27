@@ -358,6 +358,32 @@ hr{
 </style>
 </head>
 <body>
+<script>
+// ── One-tap local reset: open the site with ?reset=1 to wipe all locally
+// cached data (localStorage + service-worker caches) and force a clean
+// reload straight from Supabase. Useful when a device is stuck showing
+// stale local data instead of the true server state.
+(function(){
+  try {
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('reset') === '1') {
+      localStorage.clear();
+      if ('caches' in window) {
+        caches.keys().then(function(names){ names.forEach(function(n){ caches.delete(n); }); });
+      }
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(regs){
+          regs.forEach(function(r){ r.unregister(); });
+        }).finally(function(){
+          setTimeout(function(){ window.location.href = window.location.pathname; }, 300);
+        });
+      } else {
+        setTimeout(function(){ window.location.href = window.location.pathname; }, 300);
+      }
+    }
+  } catch(e) {}
+})();
+</script>
 <div id="root"></div>
 <script type="text/babel">
 const {useState,useEffect,useRef,useContext,useMemo}=React;
