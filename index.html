@@ -1327,14 +1327,46 @@ function runExportPDF(account,analyzed,goals,gevs,mom){
   h+="<div style='margin-top:24px;font-size:10px;color:#999;text-align:center;border-top:1px solid #eee;padding-top:8px'>ContentOS - "+account.name+" - "+today+"</div><script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}</script></body></html>";
   win.document.write(h);win.document.close();setTimeout(function(){win.print();},400);
 }
-// ─── SUPABASE INITIALIZATION ─────────────────────────────────
+// ─── SUPABASE INITIALIZATION (guarded — must never throw, or the whole
+//     React app fails to mount before it even gets a chance to render) ───
 const SUPABASE_URL = "https://mpfbgbfriofdzewsejng.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_RsMEt8GpyTV--PIaArvgEg_DTK-6vc6";
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let SUPABASE_SDK_FAILED = false;
+let supabase;
+try {
+  if (!window.supabase || typeof window.supabase.createClient !== "function") {
+    throw new Error("Supabase SDK did not load from CDN (window.supabase missing)");
+  }
+  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+} catch (e) {
+  SUPABASE_SDK_FAILED = true;
+  console.error("Supabase init failed — app will still render, but sign-in/sync are disabled:", e);
+  // Safe no-op stand-in so every later `supabase.xxx(...)` call resolves
+  // gracefully (as an error) instead of throwing synchronously and killing
+  // the whole script before React ever mounts.
+  const failResult = () => Promise.resolve({ data: null, error: { message: "Supabase SDK failed to load" } });
+  const stubQuery = {
+    select(){ return stubQuery; }, eq(){ return stubQuery; }, order(){ return stubQuery; },
+    maybeSingle: failResult, upsert: failResult, update(){ return stubQuery; }, insert(){ return stubQuery; },
+    then(res, rej){ return failResult().then(res, rej); }
+  };
+  supabase = {
+    auth: {
+      getSession: async () => ({ data: { session: null }, error: { message: "Supabase SDK failed to load" } }),
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe(){} } } }),
+      signInWithPassword: failResult, signUp: failResult, resetPasswordForEmail: failResult,
+      signOut: async () => ({ error: null }),
+    },
+    from(){ return stubQuery; },
+    channel(){ return { on(){return this;}, subscribe(cb){ if(cb) cb('CLOSED'); return this; }, track: async()=>({}), untrack: async()=>({}), presenceState(){return {};} }; },
+    removeChannel(){},
+  };
+}
 // Secondary, non-persisted client — used only to create teammate accounts
 // without disturbing the admin's own session (see addMember()).
 function createTempAuthClient() {
+  if (SUPABASE_SDK_FAILED || !window.supabase) return supabase; // stub — signUp() will resolve with a clear error
   return window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { persistSession: false, autoRefreshToken: false }
   });
