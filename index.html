@@ -1324,7 +1324,7 @@ function runExportPDF(account,analyzed,goals,gevs,mom){
     }
     h+="</tbody></table>";
   }
-  h+="<div style='margin-top:24px;font-size:10px;color:#999;text-align:center;border-top:1px solid #eee;padding-top:8px'>ContentOS - "+account.name+" - "+today+"</div><script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}</script></body></html>";
+  h+="<div style='margin-top:24px;font-size:10px;color:#999;text-align:center;border-top:1px solid #eee;padding-top:8px'>ContentOS - "+account.name+" - "+today+"</div><script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}<\/script></body></html>";
   win.document.write(h);win.document.close();setTimeout(function(){win.print();},400);
 }
 // ─── SUPABASE INITIALIZATION (guarded — must never throw, or the whole
@@ -2223,7 +2223,7 @@ function PostPrintModal({plan,post,onClose}){
       h += `<table><tbody><tr><td>${(fieldVals[selField]||"").toString().replace(/\n/g,"<br/>")||"—"}</td></tr></tbody></table>`;
     }
 
-    h += `<div style='margin-top:24px;font-size:10px;color:#999;text-align:center;border-top:1px solid #eee;padding-top:8px'>ContentOS — ${today}</div><script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}</script>
+    h += `<div style='margin-top:24px;font-size:10px;color:#999;text-align:center;border-top:1px solid #eee;padding-top:8px'>ContentOS — ${today}</div><script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}<\/script>
 </body></html>`;
     win.document.write(h); win.document.close(); setTimeout(()=>win.print(),400);
     onClose();
