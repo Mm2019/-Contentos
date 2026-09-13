@@ -1373,35 +1373,88 @@ function createTempAuthClient() {
 }
 
 async function loadData() {
-  // Returns { data: object|null, source: 'supabase'|'supabaseEmpty'|'localStorage'|'unavailable', updatedAt: string|null }
-  // 'supabaseEmpty' = Supabase confirmed the row is brand new/empty → safe to show bootstrap
-  // 'unavailable'   = Supabase blocked/timed out AND no localStorage → do NOT show bootstrap
+  // Returns { data, source, updatedAt, error }.
+  // IMPORTANT: this function must only query content_os_data after Supabase Auth
+  // has restored the current session. Otherwise a fresh browser can hit RLS as
+  // anon while an old browser appears to work from localStorage.
   try {
-    const supabaseResult = await Promise.race([
-      supabase.from("content_os_data").select("data,updated_at").eq("id", 1).maybeSingle()
-        .then(({ data, error }) => ({ data, error, ok: !error })),
-      new Promise(resolve => setTimeout(() => resolve({ ok: false }), 6000))
-    ]);
+    const timeout = new Promise(resolve => setTimeout(() => resolve({
+      ok:false, error:{message:"Supabase request timed out"}
+    }), 10000));
+
+    const request = (async()=>{
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) return {ok:false,error:sessionError};
+      const session = sessionData?.session || null;
+
+      const { data, error } = await supabase
+        .from("content_os_data")
+        .select("data,updated_at")
+        .eq("id", 1)
+        .maybeSingle();
+
+      if (error) return {
+        ok:false,
+        error:{
+          message:error.message || "Database read failed",
+          code:error.code || "",
+          details:error.details || "",
+          hint:error.hint || "",
+          hasSession:!!session
+        }
+      };
+
+      return {ok:true,data,hasSession:!!session};
+    })();
+
+    const supabaseResult = await Promise.race([request, timeout]);
+
     if (supabaseResult.ok) {
       const row = supabaseResult.data;
       if (row && row.data && Object.keys(row.data).length > 0) {
-        return { data: row.data, source: 'supabase', updatedAt: row.updated_at || null };
+        return {data:row.data,source:"supabase",updatedAt:row.updated_at||null,error:null};
       }
-      // Supabase responded but row is empty/missing — bootstrap is safe
-      // Still check localStorage in case admin is on same device
+
+      // Supabase responded successfully but the row is empty/missing.
+      // Check localStorage only as a same-device migration fallback.
       try {
         const ls = localStorage.getItem("cos_v8");
-        if (ls) return { data: JSON.parse(ls), source: 'localStorage', updatedAt: row?.updated_at || null };
+        if (ls) return {
+          data:JSON.parse(ls),
+          source:"localStorage",
+          updatedAt:row?.updated_at||null,
+          error:null
+        };
       } catch(e) {}
-      return { data: null, source: 'supabaseEmpty', updatedAt: row?.updated_at || null };
+
+      return {data:null,source:"supabaseEmpty",updatedAt:row?.updated_at||null,error:null};
     }
-  } catch(e) { console.warn("Supabase load error:", e.code || e.message); }
-  // Supabase failed (RLS denied, timeout, or network error)
-  try {
-    const ls = localStorage.getItem("cos_v8");
-    if (ls) return { data: JSON.parse(ls), source: 'localStorage', updatedAt: null };
-  } catch(e) {}
-  return { data: null, source: 'unavailable', updatedAt: null };
+
+    console.warn("Supabase load failed:", supabaseResult.error);
+    try {
+      const ls = localStorage.getItem("cos_v8");
+      if (ls) return {
+        data:JSON.parse(ls),
+        source:"localStorage",
+        updatedAt:null,
+        error:supabaseResult.error||null
+      };
+    } catch(e) {}
+
+    return {
+      data:null,
+      source:"unavailable",
+      updatedAt:null,
+      error:supabaseResult.error||null
+    };
+  } catch(e) {
+    console.warn("Supabase load exception:", e?.code || e?.message || e);
+    try {
+      const ls = localStorage.getItem("cos_v8");
+      if (ls) return {data:JSON.parse(ls),source:"localStorage",updatedAt:null,error:e};
+    } catch(_) {}
+    return {data:null,source:"unavailable",updatedAt:null,error:e};
+  }
 }
 
 // Conditional save: only overwrites the row if nobody else has changed it since
@@ -4261,7 +4314,7 @@ function LoginOverlay({plan, planLoaded, dbConfirmedEmpty, onDemoStart}) {
         </div>
         <div style={{fontSize:12, color:"#57606A", lineHeight:1.9, marginBottom:18}}>
           لا يمكن قراءة بيانات الفريق.<br/>
-          <span style={{color:"#6E7781"}}>السبب الأكثر شيوعاً: سياسات Row Level Security في Supabase تمنع القراءة.</span>
+          <span style={{color:"#6E7781"}}>تأكد أن حسابك مسجل في Supabase وأن سياسة RLS للـ authenticated تسمح بالقراءة. هذا الخطأ لا يعني أن بيانات الفريق مفقودة.</span>
         </div>
         <div style={{padding:"12px 14px", background:"rgba(239,159,39,0.06)", border:"1px solid rgba(239,159,39,0.2)",
                      borderRadius:8, marginBottom:18, textAlign:"right"}}>
@@ -7357,82 +7410,144 @@ function App(){
   const [toasts, setToasts] = useState([]);
   const readOnly = user?.role === "viewer";
 
-  // ── Supabase Auth state listener ─────────────────────────
+  // ── Supabase Auth + data bootstrap ────────────────────────
   useEffect(()=>{
-    let planCache = null;
+    let cancelled = false;
+    let activeAuthUid = null;
+    let presenceChannel = null;
 
     async function handleAuthUser(sbUser) {
+      if (cancelled) return;
+      activeAuthUid = sbUser?.id || null;
+
       if (!sbUser) {
-        // Not signed in — load plan to check bootstrap state
-        if (!planCache) {
-          const { data: d, source, updatedAt } = await loadData();
-          planCache = (d && Object.keys(d).length > 0) ? ensureDefaults(d) : {};
-          dataUpdatedAtRef.current = updatedAt || null;
-          setPlan(planCache);
-          // Determine if Supabase confirmed DB is empty (safe to bootstrap)
-          // vs Supabase was inaccessible (don't show bootstrap — data may exist)
-          if (source === 'supabaseEmpty') setDbConfirmedEmpty(true);
-          else if (source === 'supabase' || source === 'localStorage') setDbConfirmedEmpty(false);
-          else setDbConfirmedEmpty(false); // 'unavailable' → don't bootstrap
-        }
+        // Anonymous visitors cannot read content_os_data when RLS is enabled.
+        // Do not mistake an RLS/network failure for an empty database.
+        const result = await loadData();
+        if (cancelled || activeAuthUid) return;
+        const {data:d,source,updatedAt} = result;
+        const loaded = (d && Object.keys(d).length > 0) ? ensureDefaults(d) : {};
+        dataUpdatedAtRef.current = updatedAt || null;
+        setPlan(loaded);
+        setDbConfirmedEmpty(source === "supabaseEmpty");
         setPlanLoaded(true);
         setUser(null);
         return;
       }
 
-      // Signed in via Supabase Auth — load plan and find profile
       try {
-        const { data: d, updatedAt } = await loadData();
-        dataUpdatedAtRef.current = updatedAt || null;
-        const rawPlan = (d && Object.keys(d).length > 0) ? d : {};
-        planCache = ensureDefaults(rawPlan);
-        if(planCache!==rawPlan) { // persist newly-seeded defaults
-          saveData(planCache, dataUpdatedAtRef.current).then(r=>{ if(r?.ok) dataUpdatedAtRef.current=r.updatedAt; });
-        }
-        setPlan(planCache);
-        const users = planCache._users || [];
-        // Match by authUid first, then by email (for legacy / first-time)
-        let profile = users.find(u => u.authUid === sbUser.id)
-                   || users.find(u => u.email === sbUser.email?.toLowerCase());
-        if (profile) {
-          // Persist authUid if not set yet
-          if (!profile.authUid) {
-            profile = {...profile, authUid: sbUser.id};
-            const updated = users.map(u => u.id === profile.id ? profile : u);
-            const newPlan = {...planCache, _users: updated};
-            setPlan(newPlan);
-            saveData(newPlan, dataUpdatedAtRef.current).then(r=>{ if(r?.ok) dataUpdatedAtRef.current=r.updatedAt; });
-          }
-          setUser(profile);
-          // Set presence
-          try {
-            const ch = supabase.channel("content_os_presence",{config:{presence:{key:String(profile.id)}}});
-            ch.subscribe(async(status)=>{
-              if(status==="SUBSCRIBED"){
-                await ch.track({name:profile.name, lastSeen:Date.now(), role:profile.role||""});
-              }
-            });
-          } catch(e) {}
-        } else {
-          // No profile in DB = account not authorized
-          await supabase.auth.signOut();
+        // Session is already known from Auth. loadData also verifies it before
+        // querying, which fixes the fresh-browser/localStorage-only race.
+        const result = await loadData();
+        if (cancelled || activeAuthUid !== sbUser.id) return;
+
+        if (result.source === "unavailable") {
+          const e = result.error || {};
+          console.error("ContentOS database read failed:", e);
+          // Keep the auth session. The UI will show a precise database error
+          // instead of signing the user out because of a transient RLS/network issue.
+          setPlan({});
           setUser(null);
+          setDbConfirmedEmpty(false);
+          setPlanLoaded(true);
+          return;
         }
+
+        dataUpdatedAtRef.current = result.updatedAt || null;
+        const rawPlan = (result.data && Object.keys(result.data).length > 0) ? result.data : {};
+        const normalized = ensureDefaults(rawPlan);
+        setPlan(normalized);
+
+        const users = normalized._users || [];
+        const email = String(sbUser.email || "").trim().toLowerCase();
+        // Match by immutable Supabase Auth UID first. Email is only a legacy
+        // fallback for profiles created before authUid was stored.
+        let profile = users.find(u => String(u.authUid||"") === String(sbUser.id))
+                   || users.find(u => String(u.email||"").trim().toLowerCase() === email);
+
+        if (!profile) {
+          // Auth account exists but there is no ContentOS team profile.
+          // Do not leave an unauthorized session active.
+          await supabase.auth.signOut();
+          if (!cancelled) setUser(null);
+          return;
+        }
+
+        if (!profile.authUid) {
+          profile = {...profile, authUid:sbUser.id};
+          const updated = users.map(u => u.id === profile.id ? profile : u);
+          const newPlan = {...normalized,_users:updated};
+          setPlan(newPlan);
+          saveData(newPlan,dataUpdatedAtRef.current).then(r=>{
+            if(r?.ok) dataUpdatedAtRef.current=r.updatedAt;
+          });
+        }
+
+        if (cancelled || activeAuthUid !== sbUser.id) return;
+        setUser(profile);
+        setPlanLoaded(true);
+
+        // Presence is deliberately separate from the auth/data load.
+        try {
+          if (presenceChannel) supabase.removeChannel(presenceChannel);
+          const ch = supabase.channel("content_os_presence",{
+            config:{presence:{key:String(profile.id)}}
+          });
+          presenceChannel = ch;
+          ch.subscribe(async(status)=>{
+            if(status==="SUBSCRIBED"){
+              try {
+                await ch.track({
+                  name:profile.name,
+                  lastSeen:Date.now(),
+                  role:profile.role||""
+                });
+              } catch(e) {}
+            }
+          });
+        } catch(e) {}
       } catch(e) {
-        setUser(null);
+        console.error("ContentOS auth/data bootstrap failed:",e);
+        if (!cancelled) {
+          setUser(null);
+          setDbConfirmedEmpty(false);
+          setPlanLoaded(true);
+        }
       }
-      setPlanLoaded(true);
     }
 
-    // onAuthStateChange fires once immediately with the current session
-    // (event "INITIAL_SESSION"), then again on every SIGNED_IN/SIGNED_OUT —
-    // mirrors Firebase's onAuthStateChanged behavior we relied on before.
-    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      handleAuthUser(session?.user || null);
+    // First restore the persisted session explicitly. This is important on a
+    // second browser/device because there is no localStorage copy of ContentOS
+    // data there. Then subscribe to future auth changes.
+    (async()=>{
+      try {
+        const {data,error} = await supabase.auth.getSession();
+        if (error) throw error;
+        await handleAuthUser(data?.session?.user || null);
+      } catch(e) {
+        console.error("Supabase session restore failed:",e);
+        if (!cancelled) {
+          setDbConfirmedEmpty(false);
+          setPlanLoaded(true);
+        }
+      }
+    })();
+
+    // Never perform Supabase reads directly inside the Auth callback. Supabase
+    // can hold an internal auth lock while invoking this callback. Deferring
+    // avoids intermittent deadlocks/races on a fresh browser.
+    const {data:sub} = supabase.auth.onAuthStateChange((event,session)=>{
+      setTimeout(()=>{
+        if (!cancelled) handleAuthUser(session?.user || null);
+      },0);
     });
 
-    return () => sub.subscription.unsubscribe();
-  }, []);
+    return ()=>{
+      cancelled = true;
+      try { sub?.subscription?.unsubscribe(); } catch(e) {}
+      try { if(presenceChannel) supabase.removeChannel(presenceChannel); } catch(e) {}
+    };
+  },[]);
 
   function show(msg) {
     const id = Date.now();
