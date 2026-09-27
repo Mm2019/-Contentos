@@ -1,0 +1,21 @@
+# Phase 13 Acceptance
+
+- [x] Listings
+- [x] Category-aware attributes
+- [x] Categories
+- [x] Deals
+- [x] Verification
+- [x] Trust
+- [x] Reviews
+- [x] Reports
+- [x] Disputes
+- [x] Safety
+- [x] Project-scoped Marketplace route
+- [x] Global Marketplace route
+- [x] Commerce Order reference from Marketplace Deals
+- [x] Finance Transaction reference without duplicate ledger
+- [x] Workspace/project RLS policies
+- [x] Existing ContentOS remains untouched
+- [x] No second ContentOS implementation introduced
+- [ ] Live Supabase migration verified in a connected environment
+- [ ] Browser/Vite runtime verified in a dependency-complete environment

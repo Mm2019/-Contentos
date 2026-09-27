@@ -1,0 +1,15 @@
+{
+  "static_validation": "PASS",
+  "contentos_identical": true,
+  "contentos_sha256": "55c8749a4e90b1258f68bbe9882d6ade5f1ddb6f73f5a837c0842c38962c3804",
+  "phase24_tables": 36,
+  "phase24_views": 2,
+  "phase24_functions": 5,
+  "phase14_status": "SKIPPED",
+  "runtime_vite": "NOT VERIFIED",
+  "runtime_supabase": "NOT VERIFIED",
+  "node_modules_in_tree": false,
+  "contentos_duplicate_schema_in_phase24_sql": false,
+  "fitness_youtube_embed_logic": "PASS",
+  "today_fitness_aggregation": "PASS"
+}

@@ -1,0 +1,9 @@
+{
+  "tables": 87,
+  "mutableTables": 75,
+  "readOnlyTables": 12,
+  "crudContract": "PASS",
+  "contentOSByteForByte": "PASS",
+  "fullRuntime": "NOT_VERIFIED",
+  "liveSupabase": "NOT_VERIFIED"
+}

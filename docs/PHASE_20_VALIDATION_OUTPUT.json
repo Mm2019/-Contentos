@@ -1,0 +1,16 @@
+{
+  "ok": [
+    "Syntax/transpile: 42 JS/JSX files parsed",
+    "Local relative imports resolved",
+    "Routes/imports inspected: 22 page imports",
+    "Migration chain: 13 numbered SQL migrations",
+    "Cross-module table references: 38 checked",
+    "No active content_* table definitions in Unified OS SQL",
+    "RLS coverage markers: 87 UOS tables",
+    "ContentOS SHA-256: 55c8749a4e90b1258f68bbe9882d6ade5f1ddb6f73f5a837c0842c38962c3804",
+    "Required route matrix: 19 routes",
+    "Phase 14 skip recorded"
+  ],
+  "warnings": [],
+  "failures": []
+}
