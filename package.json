@@ -1,7 +1,7 @@
 {
   "name": "unified-os-contentos-foundation",
   "private": true,
-  "version": "1.0.0-phase-24",
+  "version": "1.0.0-phase-25",
   "type": "module",
   "scripts": {
     "dev": "vite",

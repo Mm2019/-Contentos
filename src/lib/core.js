@@ -91,7 +91,7 @@ export async function rpc(name, params = {}) {
 
 export async function listTableRecords(table, { workspaceId = null, workspaceScoped = true, order = 'created_at' } = {}) {
   if (supabase) {
-    let q = supabase.from(table).select('*').order(['created_at','updated_at','occurred_at'].includes(order) ? order : 'created_at', { ascending: false })
+    let q = supabase.from(table).select('*').order(order in ['created_at','updated_at','occurred_at','created_at'] ? order : 'created_at', { ascending: false })
     if (workspaceScoped && workspaceId) q = q.eq('workspace_id', workspaceId)
     const { data, error } = await q
     if (error) throw error

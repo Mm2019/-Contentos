@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createTableRecord, deleteTableRecord, listTableRecords, updateTableRecord } from '../lib/core'
 import { useWorkspace } from '../lib/workspace'
-import { useEffect as useReactEffect } from 'react'
-import { supabase } from '../lib/supabase'
 import { UOS_SCHEMA } from '../lib/schemaRegistry'
 
 const HIDDEN = new Set(['id','workspace_id','created_at','updated_at'])
@@ -58,9 +56,6 @@ export default function DataManager(){
   const {workspace}=useWorkspace()
   const [table,setTable]=useState('uos_projects')
   const [rows,setRows]=useState([])
-  const [authorized,setAuthorized]=useState(false)
-  const [authChecked,setAuthChecked]=useState(false)
-  useReactEffect(()=>{(async()=>{try{if(!supabase){setAuthorized(false)}else{const {data,error}=await supabase.rpc('uos_security_context',{p_workspace:workspace?.id});setAuthorized(!error && ['owner','admin'].includes(data?.role))}}finally{setAuthChecked(true)}})()},[workspace?.id])
   const [loading,setLoading]=useState(false)
   const [busy,setBusy]=useState(false)
   const [error,setError]=useState('')
@@ -81,7 +76,7 @@ export default function DataManager(){
   },[rows,query])
 
   async function load(){
-    if(!workspace || !def || !authorized) return
+    if(!workspace || !def) return
     setLoading(true);setError('');
     try{
       const data=await listTableRecords(table,{workspaceId:workspace.id,workspaceScoped:def.workspaceScoped})
@@ -89,7 +84,7 @@ export default function DataManager(){
     }catch(e){setError(e.message||'تعذر تحميل السجلات')}
     finally{setLoading(false)}
   }
-  useEffect(()=>{load()},[table,workspace?.id,authorized])
+  useEffect(()=>{load()},[table,workspace?.id])
 
   function newRecord(){
     if(def.readOnly){setError('هذا الجدول للقراءة فقط.');return}
@@ -127,10 +122,7 @@ export default function DataManager(){
     finally{setBusy(false)}
   }
 
-  if(!authChecked) return <div className="card">جارٍ التحقق من الصلاحيات…</div>
-  if(!authorized) return <div className="card"><h1>إدارة البيانات المتقدمة</h1><p className="error">هذه الصفحة متاحة للمالك أو مسؤول النظام فقط، وتتجاوز بعض قواعد التحقق الموجودة في صفحات الوحدات. استخدمها بحذر.</p></div>
   return <div>
-    <div className="error" role="alert">تنبيه: محرر متقدم — قد يتجاوز قواعد التحقق الخاصة بالوحدات. استخدمه للعمليات التقنية فقط.</div>
     <header className="page-head">
       <div><div className="eyebrow">CRUD COMPLETION · PHASE 21</div><h1>Data Manager</h1><p className="muted">إدارة CRUD كاملة لسجلات Unified OS. الـContentOS الأصلي لا يُعدل من هنا.</p></div>
       <div className="actions"><button className="primary" disabled={def?.readOnly} onClick={newRecord}>+ سجل جديد</button></div>

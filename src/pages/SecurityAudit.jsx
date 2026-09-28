@@ -16,7 +16,7 @@ export default function SecurityAudit() {
   const [audit, setAudit] = useState([])
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
-  const [memberForm, setMemberForm] = useState({ email:'', role:'viewer' })
+  const [memberForm, setMemberForm] = useState({ user_id:'', role:'viewer' })
   const [selectedProject, setSelectedProject] = useState('')
   const [projectMemberForm, setProjectMemberForm] = useState({ user_id:'', role:'viewer' })
   const [financeTarget, setFinanceTarget] = useState({ user_id:'', can_view:true, can_edit:false, can_export:false })
@@ -48,12 +48,10 @@ export default function SecurityAudit() {
   const visibleProjectMembers = useMemo(() => selectedProject ? projectMembers.filter(m => m.project_id === selectedProject) : projectMembers, [projectMembers, selectedProject])
 
   async function addWorkspaceMember() {
-    if (!workspace || !memberForm.email.trim() || !context?.canManage) return
+    if (!workspace || !memberForm.user_id.trim() || !context?.canManage) return
     try {
-      if (!supabase) throw new Error('إضافة الأعضاء بالبريد تتطلب اتصال Supabase')
-      const { error } = await supabase.rpc('uos_add_workspace_member_by_email', { p_workspace:workspace.id, p_email:memberForm.email.trim(), p_role:memberForm.role })
-      if (error) throw error
-      setMemberForm({ email:'', role:'viewer' }); setMessage('Workspace member added.'); await load()
+      await createEntity('uos_workspace_members', { workspace_id:workspace.id, user_id:memberForm.user_id.trim(), role:memberForm.role, active:true })
+      setMemberForm({ user_id:'', role:'viewer' }); setMessage('Workspace member added.'); await load()
     } catch (e) { setError(e.message || String(e)) }
   }
 
@@ -95,7 +93,7 @@ export default function SecurityAudit() {
       <div className="section-head"><div><div className="eyebrow">ROLE MODEL</div><h2>Workspace Membership</h2></div><span className="muted">Owner is derived from workspace owner.</span></div>
       <div className="grid grid-2">
         <div>{members.map(m => <div className="list-row" key={m.id}><div><strong>{m.user_id}</strong><div className="muted">{m.user_id===user?.id?'You':''}</div></div><span className="chip">{m.role}</span></div>)}{!members.length&&<div className="muted">No membership rows are visible to this role.</div>}</div>
-        {context?.canManage && <div className="card"><h3>إضافة عضو أو تعديل دوره</h3><div className="form-grid"><label>البريد الإلكتروني<input type="email" value={memberForm.email} onChange={e=>setMemberForm(v=>({...v,email:e.target.value}))} placeholder="name@example.com" /></label><label>Role<select value={memberForm.role} onChange={e=>setMemberForm(v=>({...v,role:e.target.value}))}>{ROLES.map(r=><option key={r}>{r}</option>)}</select></label></div><button className="primary" onClick={addWorkspaceMember}>حفظ العضو</button></div>}
+        {context?.canManage && <div className="card"><h3>Add / update member</h3><div className="form-grid"><label>User ID<input value={memberForm.user_id} onChange={e=>setMemberForm(v=>({...v,user_id:e.target.value}))} placeholder="auth.users UUID" /></label><label>Role<select value={memberForm.role} onChange={e=>setMemberForm(v=>({...v,role:e.target.value}))}>{ROLES.map(r=><option key={r}>{r}</option>)}</select></label></div><button className="primary" onClick={addWorkspaceMember}>Save member</button></div>}
       </div>
     </section>
 

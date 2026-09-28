@@ -1,0 +1,56 @@
+export const PROJECT_PROFILES = [
+  { key: 'personal_research', name: 'Personal / Research', defaultModules: ['Tasks','Goals','Calendar','Knowledge'] },
+  { key: 'app_saas', name: 'App / SaaS', defaultModules: ['Tasks','Goals','Calendar','Product','PRD','Features','Releases','QA','Support','Analytics','Finance','Team'] },
+  { key: 'marketplace', name: 'Marketplace', defaultModules: ['Tasks','Goals','Calendar','Marketplace','Analytics','Finance','Marketing','Support','Team','ContentOS'] },
+  { key: 'ecommerce', name: 'E-commerce', defaultModules: ['Tasks','Goals','Calendar','Product','Marketplace','Analytics','Finance','Marketing','ContentOS'] },
+  { key: 'content_creator', name: 'Content / Creator', defaultModules: ['Tasks','Goals','Calendar','ContentOS','Analytics','Marketing','Finance','Affiliate'] },
+  { key: 'blog_seo', name: 'Blog / SEO', defaultModules: ['Tasks','Goals','Calendar','ContentOS','Knowledge','Analytics','Marketing'] },
+  { key: 'affiliate', name: 'Affiliate', defaultModules: ['Tasks','Goals','Calendar','ContentOS','Analytics','Marketing','Finance','Affiliate'] },
+  { key: 'digital_product', name: 'Digital Product', defaultModules: ['Tasks','Goals','Calendar','Product','ContentOS','Analytics','Finance','Marketing'] },
+  { key: 'delivery_logistics', name: 'Delivery / Logistics', defaultModules: ['Tasks','Goals','Calendar','Operations','Analytics','Finance','Support'] },
+  { key: 'service_business', name: 'Service Business', defaultModules: ['Tasks','Goals','Calendar','Customers','Operations','Finance','Analytics','Support','ContentOS'] },
+  { key: 'internal_tool', name: 'Internal Tool', defaultModules: ['Tasks','Goals','Calendar','Product','PRD','Features','Releases','QA','Knowledge'] },
+  { key: 'community', name: 'Community', defaultModules: ['Tasks','Goals','Calendar','ContentOS','Marketing','Analytics','Support','Team'] },
+  { key: 'media', name: 'Media', defaultModules: ['Tasks','Goals','Calendar','ContentOS','Publishing','Analytics','Marketing','Finance','Team'] },
+  { key: 'hybrid', name: 'Hybrid', defaultModules: ['Tasks','Goals','Calendar','Analytics','Finance'] },
+]
+
+export const PROJECT_MODULES = [
+  { key: 'Tasks', label: 'Tasks', group: 'Core', route: '/tasks' },
+  { key: 'Goals', label: 'Goals', group: 'Core', route: '/goals' },
+  { key: 'Calendar', label: 'Calendar', group: 'Core', route: '/calendar' },
+  { key: 'Finance', label: 'Finance', group: 'Core', route: '/finance' },
+  { key: 'Knowledge', label: 'Knowledge', group: 'Core', route: '/resources' },
+  { key: 'Team', label: 'Team', group: 'Core', route: '/projects' },
+  { key: 'ContentOS', label: 'ContentOS', group: 'Content', route: '/contentos', subsystem: true },
+  { key: 'Publishing', label: 'Publishing', group: 'Content', route: '/contentos' },
+  { key: 'Marketing', label: 'Marketing', group: 'Growth', route: '/projects' },
+  { key: 'Analytics', label: 'Analytics', group: 'Growth', route: '/projects' },
+  { key: 'Affiliate', label: 'Affiliate', group: 'Growth', route: '/projects' },
+  { key: 'Product', label: 'Product', group: 'Product', route: '/projects' },
+  { key: 'PRD', label: 'PRD', group: 'Product', route: '/projects' },
+  { key: 'Features', label: 'Features', group: 'Product', route: '/projects' },
+  { key: 'Releases', label: 'Releases', group: 'Product', route: '/projects' },
+  { key: 'QA', label: 'QA', group: 'Product', route: '/projects' },
+  { key: 'Support', label: 'Support', group: 'Operations', route: '/projects' },
+  { key: 'Customers', label: 'Customers', group: 'Operations', route: '/projects' },
+  { key: 'Operations', label: 'Operations', group: 'Operations', route: '/projects' },
+  { key: 'Marketplace', label: 'Marketplace', group: 'Commerce', route: '/projects' },
+  { key: 'Commerce', label: 'Commerce', group: 'Commerce', route: '/projects' },
+]
+
+export const MODULE_GROUPS = ['Core','Content','Growth','Product','Operations','Commerce']
+
+export function profileByName(name) {
+  return PROJECT_PROFILES.find(p => p.name === name) || PROJECT_PROFILES[0]
+}
+
+export function normalizeModules(value) {
+  if (!Array.isArray(value)) return []
+  const valid = new Set(PROJECT_MODULES.map(m => m.key))
+  return [...new Set(value.filter(v => valid.has(v)))]
+}
+
+export function moduleMeta(key) {
+  return PROJECT_MODULES.find(m => m.key === key) || { key, label: key, group: 'Other', route: '/projects' }
+}
