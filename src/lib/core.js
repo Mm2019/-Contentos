@@ -9,8 +9,14 @@ function writeCache(value) { try { localStorage.setItem(LOCAL_KEY, JSON.stringif
 export async function ensureWorkspace(user) {
   if (!user) return null
   if (supabase) {
-    const { data, error } = await supabase.rpc('uos_ensure_personal_workspace', { p_name: `${user.email || 'Personal'} OS` })
-    if (!error && data) return data
+    // This RPC returns a plain UUID (the workspace id), not a row.
+    const { data: workspaceId, error } = await supabase.rpc('uos_ensure_personal_workspace', { p_name: `${user.email || 'Personal'} OS` })
+    if (!error && workspaceId) {
+      const { data: ws, error: wsErr } = await supabase.from('uos_workspaces').select('*').eq('id', workspaceId).single()
+      if (!wsErr && ws) return ws
+      // Fallback so callers relying on workspace.id never see "undefined" again.
+      return { id: workspaceId, name: `${user.email || 'Personal'} OS`, base_currency: 'EGP' }
+    }
   }
   const cache = readCache()
   cache.workspace ??= { id: `local-${user.id}`, name: `${user.email || 'Personal'} OS`, base_currency: 'EGP' }
