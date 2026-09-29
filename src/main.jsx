@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { initArabicLocalization } from './lib/i18n'
 import { AuthProvider } from './lib/auth'
 import { WorkspaceProvider } from './lib/workspace'
 import RequireAuth from './components/RequireAuth'
@@ -148,3 +149,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     </BrowserRouter>
   </React.StrictMode>,
 )
+
+// Runs after the initial paint so it can see React's rendered DOM, then keeps
+// watching for route changes / async data via MutationObserver.
+initArabicLocalization()
