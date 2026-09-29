@@ -3,33 +3,33 @@ import { useAuth } from '../lib/auth'
 import { useWorkspace } from '../lib/workspace'
 
 const links = [
-  ['/', '⌂', 'Command Center'],
-  ['/today', '📅', 'Today'],
-  ['/parity', '🧩', 'Notion OS Parity'],
-  ['/projects', '▣', 'Projects'],
-  ['/personal', '◉', 'Personal'],
-  ['/business', '▣', 'Business OS'],
-  ['/fitness', '💪', 'Fitness'],
-  ['/habits', '✓', 'Habits'],
-  ['/home', '⌂', 'Home OS'],
-  ['/tasks', '✓', 'Tasks'],
-  ['/goals', '◎', 'Goals'],
-  ['/finance', '¤', 'Finance'],
-  ['/calendar', '◫', 'Calendar'],
-  ['/knowledge', '↗', 'Knowledge'],
-  ['/learning', '📚', 'Learning'],
-  ['/resources', '↗', 'Resources'],
-  ['/contentos', '◈', 'ContentOS'],
-  ['/contentos/configuration', '⚙', 'ContentOS Config'],
-  ['/contentos/analytics', '↗', 'ContentOS Analytics'],
-  ['/contentos/intelligence', '🧠', 'Content Intelligence'],
-  ['/product', '◉', 'Product / SaaS'],
-  ['/commerce', '▤', 'Commerce'],
-  ['/marketplace', '◇', 'Marketplace'],
-  ['/intelligence', '🧠', 'Global Intelligence'],
-  ['/system/security', '🔐', 'Security & Audit'],
-  ['/system/recovery', '↺', 'Versioning & Recovery'],
-  ['/system/data', '🧰', 'Data Manager'],
+  ['/', '⌂', 'مركز التحكم'],
+  ['/today', '📅', 'اليوم'],
+  ['/parity', '🧩', 'التطابق مع Notion'],
+  ['/projects', '▣', 'المشاريع'],
+  ['/personal', '◉', 'شخصي'],
+  ['/business', '▣', 'نظام الأعمال'],
+  ['/fitness', '💪', 'اللياقة'],
+  ['/habits', '✓', 'العادات'],
+  ['/home', '⌂', 'نظام المنزل'],
+  ['/tasks', '✓', 'المهام'],
+  ['/goals', '◎', 'الأهداف'],
+  ['/finance', '¤', 'المالية'],
+  ['/calendar', '◫', 'التقويم'],
+  ['/knowledge', '↗', 'المعرفة'],
+  ['/learning', '📚', 'التعلّم'],
+  ['/resources', '↗', 'الموارد'],
+  ['/contentos', '◈', 'نظام المحتوى'],
+  ['/contentos/configuration', '⚙', 'إعدادات نظام المحتوى'],
+  ['/contentos/analytics', '↗', 'تحليلات نظام المحتوى'],
+  ['/contentos/intelligence', '🧠', 'ذكاء المحتوى'],
+  ['/product', '◉', 'المنتج / SaaS'],
+  ['/commerce', '▤', 'التجارة'],
+  ['/marketplace', '◇', 'السوق'],
+  ['/intelligence', '🧠', 'الذكاء الشامل'],
+  ['/system/security', '🔐', 'الأمان والتدقيق'],
+  ['/system/recovery', '↺', 'النسخ والاسترجاع'],
+  ['/system/data', '🧰', 'مدير البيانات'],
 ]
 
 export default function Layout() {
@@ -37,12 +37,12 @@ export default function Layout() {
   const { workspace, reload } = useWorkspace()
   return <div className="app-shell">
     <aside className="sidebar">
-      <div className="brand">UNIFIED OS<span>Foundation</span></div>
-      <div className="workspace-pill">{workspace?.name || 'Workspace'}</div>
+      <div className="brand">الأنظمة الموحدة<span>الأساس</span></div>
+      <div className="workspace-pill">{workspace?.name || 'مساحة العمل'}</div>
       <nav>{links.map(([to, icon, label]) => <NavLink key={to} to={to} end={to === '/'} className={({isActive}) => `nav-link ${isActive ? 'active' : ''}`}><span>{icon}</span>{label}</NavLink>)}</nav>
       <div className="sidebar-spacer" />
-      <button className="nav-link ghost" onClick={reload}>↻ Refresh</button>
-      <button className="nav-link ghost" onClick={signOut}>⇥ Sign out</button>
+      <button className="nav-link ghost" onClick={reload}>↻ تحديث</button>
+      <button className="nav-link ghost" onClick={signOut}>⇥ تسجيل خروج</button>
       <div className="user-chip">{user?.email}</div>
     </aside>
     <main className="main"><Outlet /></main>
