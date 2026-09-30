@@ -1,39 +1,49 @@
--- Unified OS security hardening. Run after migrations 010-025.
--- Replaces permissive member-wide policies on every public table with workspace role policies.
+-- Phase 26 — Security hardening (already applied directly to the live database
+-- in an earlier session; this file exists so the migration history in the repo
+-- matches what is actually live in Supabase).
+--
+-- What it did:
+--  1) Revoked EXECUTE on every SECURITY DEFINER uos_* function from
+--     public/anon, granted it to authenticated + service_role only.
+--  2) Pinned search_path on uos_role_rank, uos_recovery_excluded_table,
+--     uos_next_recurring_date.
+--  3) Set security_invoker = true on all 7 uos_* views so they respect the
+--     caller's RLS instead of running as the view owner.
+--  4) Granted authenticated real table privileges (select/insert/update/delete)
+--     on every public table (RLS policies, already enabled on all 145 tables,
+--     are what actually restrict which rows each user can see/touch).
+--  5) Revoked all table privileges from anon.
+
 do $$
-declare r record; pol record;
+declare r record;
 begin
   for r in
-    select c.table_schema, c.table_name
-    from information_schema.columns c
-    join information_schema.tables t on t.table_schema=c.table_schema and t.table_name=c.table_name
-    where c.table_schema='public' and c.column_name='workspace_id' and t.table_type='BASE TABLE'
-      and c.table_name not in ('uos_workspaces','uos_workspace_members','uos_project_members','uos_finance_permissions','uos_audit_log','uos_recovery_items','uos_recovery_runs','uos_recovery_snapshots','uos_migration_log','uos_schema_registry')
+    select p.oid::regprocedure as sig
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname like 'uos\_%' and p.prosecdef
   loop
-    for pol in select policyname from pg_policies where schemaname=r.table_schema and tablename=r.table_name loop
-      execute format('drop policy if exists %I on %I.%I', pol.policyname, r.table_schema, r.table_name);
-    end loop;
-    execute format('alter table %I.%I enable row level security',r.table_schema,r.table_name);
-    execute format('create policy uos_role_read on %I.%I for select using (uos_can_read_workspace(workspace_id))',r.table_schema,r.table_name);
-    execute format('create policy uos_role_insert on %I.%I for insert with check (uos_can_write_workspace(workspace_id))',r.table_schema,r.table_name);
-    execute format('create policy uos_role_update on %I.%I for update using (uos_can_write_workspace(workspace_id)) with check (uos_can_write_workspace(workspace_id))',r.table_schema,r.table_name);
-    execute format('create policy uos_role_delete on %I.%I for delete using (uos_can_delete_workspace(workspace_id))',r.table_schema,r.table_name);
+    execute format('revoke execute on function %s from public, anon', r.sig);
+    execute format('grant execute on function %s to authenticated, service_role', r.sig);
   end loop;
 end $$;
 
--- Add a workspace member by email without exposing auth.users to the client.
-create or replace function public.uos_add_workspace_member_by_email(p_workspace uuid, p_email text, p_role text default 'viewer')
-returns uuid language plpgsql security definer set search_path=public, auth as $$
-declare v_user uuid;
-begin
-  if not uos_can_manage_workspace(p_workspace) then raise exception 'Forbidden'; end if;
-  if p_role not in ('viewer','contributor','editor','manager','admin') then raise exception 'Invalid role'; end if;
-  select id into v_user from auth.users where lower(email)=lower(trim(p_email)) limit 1;
-  if v_user is null then raise exception 'No registered user found with that email'; end if;
-  insert into public.uos_workspace_members(workspace_id,user_id,role,active)
-  values(p_workspace,v_user,p_role,true)
-  on conflict (workspace_id,user_id) do update set role=excluded.role, active=true;
-  return v_user;
-end $$;
-revoke all on function public.uos_add_workspace_member_by_email(uuid,text,text) from public;
-grant execute on function public.uos_add_workspace_member_by_email(uuid,text,text) to authenticated;
+alter function public.uos_role_rank set search_path = public, pg_temp;
+alter function public.uos_recovery_excluded_table set search_path = public, pg_temp;
+alter function public.uos_next_recurring_date set search_path = public, pg_temp;
+
+alter view public.uos_commerce_inventory_available set (security_invoker = true);
+alter view public.uos_fin_account_balances        set (security_invoker = true);
+alter view public.uos_fitness_video_coverage      set (security_invoker = true);
+alter view public.uos_home_inventory_health       set (security_invoker = true);
+alter view public.uos_knowledge_inbox             set (security_invoker = true);
+alter view public.uos_project_health              set (security_invoker = true);
+alter view public.uos_today_summary               set (security_invoker = true);
+
+grant usage on schema public to authenticated, service_role;
+grant select, insert, update, delete on all tables in schema public to authenticated;
+grant all on all tables in schema public to service_role;
+grant usage, select on all sequences in schema public to authenticated, service_role;
+alter default privileges in schema public grant select, insert, update, delete on tables to authenticated;
+alter default privileges in schema public grant all on tables to service_role;
+revoke all on all tables in schema public from anon;

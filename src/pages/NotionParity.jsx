@@ -130,7 +130,7 @@ export default function NotionParity() {
     try {
       const tables = {
         habits: 'uos_habits', habitLogs: 'uos_habit_logs', relapses: 'uos_habit_relapses', books: 'uos_habit_books', journal: 'uos_habit_journal', focus: 'uos_habit_weekly_focus', achievements: 'uos_habit_achievements',
-        inventory: 'uos_home_inventory', maintenance: 'uos_home_maintenance',
+        inventory: 'uos_home_inventory_health', maintenance: 'uos_home_maintenance',
         courses: 'uos_learning_courses', modules: 'uos_learning_modules', lessons: 'uos_learning_lessons', sessions: 'uos_learning_study_sessions', skills: 'uos_learning_skills', tests: 'uos_learning_level_tests', career: 'uos_learning_career_goals', vocab: 'uos_learning_vocabulary',
         projects: 'uos_projects', tasks: 'uos_tasks', outputs: 'uos_project_outputs', work: 'uos_project_work_sessions', risks: 'uos_project_risks', issues: 'uos_project_issues', contacts: 'uos_project_contacts', okrs: 'uos_project_okrs', krs: 'uos_project_key_results', events: 'uos_events'
       }
@@ -175,7 +175,7 @@ export default function NotionParity() {
     return { ...project, progress: leaves.length ? Math.round(done / leaves.length * 100) : 0, overdue, risks, issues, health }
   }), [data.projects, data.tasks, data.risks, data.issues])
 
-  const inventoryAlerts = data.inventory.filter(item => ['low', 'critical', 'out'].includes(item.stock_status))
+  const inventoryAlerts = data.inventory.filter(item => item.low_stock === true)
 
   return <div>
     <header className="page-head">
@@ -255,7 +255,7 @@ export default function NotionParity() {
           ['issue','Issue'],['room_id','Room ID'],['maintenance_type','Type','select',['preventive','repair']],['priority','Priority','select',['low','normal','high','critical']],['status','Status','select',['open','in_progress','completed','closed']],['recurrence_interval_days','Every X days','number'],['last_completed_at','Last completed','date'],['due_date','Due date','date'],['next_due_date','Next due','date'],['estimated_cost','Estimated cost','number']
         ]} initial={{ maintenance_type:'repair', priority:'normal', status:'open' }} />
       </div>
-      <div className="card"><h3>Home intelligence</h3>{inventoryAlerts.slice(0,12).map(i => <div className="list-row between" key={i.id}><span>{i.name}</span><span className="badge warning">{i.stock_status}</span></div>)}{!inventoryAlerts.length&&<div className="muted">لا توجد تنبيهات مخزون.</div>}</div>
+      <div className="card"><h3>Home intelligence</h3>{inventoryAlerts.slice(0,12).map(i => <div className="list-row between" key={i.id}><span>{i.name}</span><span className="badge warning">Qty {i.quantity} / Min {i.min_stock ?? i.reorder_point}</span></div>)}{!inventoryAlerts.length&&<div className="muted">لا توجد تنبيهات مخزون.</div>}</div>
     </section>}
 
     {active === 'projects' && <section className="section">

@@ -384,6 +384,18 @@ hr{
   } catch(e) {}
 })();
 </script>
+<div id="cos-boot-loader" style="position:fixed;inset:0;background:#F1F3F5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;font-family:system-ui,-apple-system,Segoe UI,Tahoma,Arial,sans-serif;direction:rtl;z-index:9999;">
+  <div style="width:44px;height:44px;border:4px solid #E5E7EB;border-top-color:#EF9F27;border-radius:50%;animation:cos-spin 0.8s linear infinite;"></div>
+  <div style="font-weight:700;color:#16181D;font-size:15px;">جارٍ تحميل ContentOS…</div>
+  <div id="cos-boot-status" style="font-size:12px;color:#57606A;">تحميل React وBabel من الإنترنت</div>
+  <div style="font-size:11px;color:#9AA1A9;max-width:280px;text-align:center;">قد يستغرق هذا بضع ثوانٍ في المرة الأولى — الصفحة قيد التجهيز، وليست متوقفة.</div>
+</div>
+<style>@keyframes cos-spin{to{transform:rotate(360deg)}}</style>
+<script>
+  // Best-effort progress text only — purely cosmetic, never blocks boot.
+  setTimeout(function(){var s=document.getElementById('cos-boot-status');if(s)s.textContent='جارٍ تجهيز الواجهة (قد يستغرق وقتًا أطول قليلاً)…';},4000);
+  setTimeout(function(){var s=document.getElementById('cos-boot-status');if(s)s.textContent='لا يزال قيد التحميل… تأكد من اتصال الإنترنت إذا استمر طويلاً';},12000);
+</script>
 <div id="root"></div>
 <script type="text/babel">
 const {useState,useEffect,useRef,useContext,useMemo}=React;
@@ -7715,10 +7727,12 @@ function App(){
   if(!el)return;
   try{
     if(typeof window.React==="undefined"||typeof window.ReactDOM==="undefined"){
+      var _lm=document.getElementById("cos-boot-loader"); if(_lm) _lm.remove();
       el.innerHTML='<div style="padding:28px;font-family:system-ui,sans-serif;direction:rtl;background:#F1F3F5;min-height:100vh;color:#16181D"><strong>ContentOS</strong><p style="margin-top:14px;color:#F87171">لم يُحمّل React أو ReactDOM من الإنترنت.</p><p style="color:#57606A;font-size:13px">شغّل من مجلد المشروع: <code style="color:#EF9F27">npx serve</code> ثم افتح الرابط عبر http://localhost — وتأكد أن unpkg أو jsdelivr غير محظورين.</p></div>';
       return;
     }
     if(typeof window.Babel==="undefined"){
+      var _lm2=document.getElementById("cos-boot-loader"); if(_lm2) _lm2.remove();
       el.innerHTML='<div style="padding:28px;font-family:system-ui,sans-serif;direction:rtl;background:#F1F3F5;min-height:100vh;color:#16181D"><strong>ContentOS</strong><p style="margin-top:14px;color:#F87171">لم يُحمّل Babel Standalone.</p><p style="color:#57606A;font-size:13px">تحقق من الاتصال بالإنترنت أو جرّب شبكة أخرى.</p></div>';
       return;
     }
@@ -7730,7 +7744,9 @@ function App(){
     }else{
       throw new Error("لا توجد createRoot ولا render في ReactDOM");
     }
+    var _lok=document.getElementById("cos-boot-loader"); if(_lok) _lok.remove();
   }catch(err){
+    var _lerr=document.getElementById("cos-boot-loader"); if(_lerr) _lerr.remove();
     console.error(err);
     el.innerHTML='<div style="padding:28px;font-family:system-ui,sans-serif;direction:rtl;background:#F1F3F5;min-height:100vh;color:#F87171"><strong>ContentOS</strong><pre style="margin-top:14px;white-space:pre-wrap;font-size:12px;color:#16181D">'+String(err&&err.message||err)+'</pre></div>';
   }
