@@ -34,6 +34,30 @@ import Today from './pages/Today'
 import NotionParity from './pages/NotionParity'
 import './styles.css'
 
+class AppErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { error: null } }
+  static getDerivedStateFromError(error) { return { error } }
+  componentDidCatch(error, info) { console.error('UI crashed:', error, info) }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: 32, direction: 'rtl', fontFamily: 'system-ui,sans-serif', background: '#fff5f4', minHeight: '100vh' }}>
+          <h2 style={{ color: '#b42318', margin: '0 0 12px' }}>الصفحة واجهت خطأ ولم تستطع تحمل نفسها</h2>
+          <p style={{ color: '#667085' }}>ابعت نص الرسالة التالية بالظبط عشان يتصلح:</p>
+          <pre style={{ whiteSpace: 'pre-wrap', background: '#fff', border: '1px solid #f3c7c3', borderRadius: 8, padding: 14, fontSize: 12, direction: 'ltr', textAlign: 'left' }}>
+            {String(this.state.error && (this.state.error.stack || this.state.error.message || this.state.error))}
+          </pre>
+          <button onClick={() => { this.setState({ error: null }); window.location.href = '/' }}
+            style={{ marginTop: 14, padding: '10px 16px', borderRadius: 9, border: '1px solid #b42318', background: '#fff', color: '#b42318', cursor: 'pointer', font: 'inherit' }}>
+            الرجوع للصفحة الرئيسية
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
 function App() {
   return (
     <AuthProvider>
@@ -128,9 +152,9 @@ function App() {
                   fields={[
                     ['title', 'اسم المورد'],
                     ['url', 'URL', 'url'],
-                    ['status', ['new', 'testing', 'essential', 'reference', 'future', 'archived'], 'select'],
+                    ['status', ['inbox', 'reading', 'reference', 'archived'], 'select'],
                   ]}
-                  defaults={{ status: 'new', title: '', url: '' }}
+                  defaults={{ status: 'inbox', title: '', url: '' }}
                 />}
               />
               <Route path="*" element={<Navigate to="/" replace />} />
@@ -144,9 +168,11 @@ function App() {
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
+    <AppErrorBoundary>
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+    </AppErrorBoundary>
   </React.StrictMode>,
 )
 
