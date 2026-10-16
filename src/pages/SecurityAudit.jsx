@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useAuth } from '../lib/auth'
 import { useWorkspace } from '../lib/workspace'
 import { createEntity, listEntities, updateEntity } from '../lib/core'
 import { supabase } from '../lib/supabase'
@@ -8,7 +7,6 @@ import { supabase } from '../lib/supabase'
 const ROLES = ['viewer','contributor','editor','manager','admin']
 
 export default function SecurityAudit() {
-  const { user } = useAuth()
   const { workspace } = useWorkspace()
   const [context, setContext] = useState(null)
   const [projects, setProjects] = useState([])
@@ -31,8 +29,7 @@ export default function SecurityAudit() {
       setContext(nextContext)
       const p = await listEntities('uos_projects', workspace.id)
       setProjects(p)
-      if (selectedProject) setProjectMembers(await listEntities('uos_project_members', workspace.id))
-      else setProjectMembers(await listEntities('uos_project_members', workspace.id))
+      setProjectMembers(await listEntities('uos_project_members', workspace.id))
       if (nextContext?.canViewAudit) setAudit(await listEntities('uos_audit_log', workspace.id, 'created_at'))
       if (nextContext?.canManage) setFinancePermissions(await listEntities('uos_finance_permissions', workspace.id))
     } catch (e) { setError(e.message || String(e)) }
