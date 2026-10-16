@@ -27,6 +27,7 @@ const links = [
   ['/commerce', '▤', 'التجارة'],
   ['/marketplace', '◇', 'السوق'],
   ['/intelligence', '🧠', 'الذكاء الشامل'],
+  ['/settings', '⚙', 'الإعدادات العامة'],
   ['/system/security', '🔐', 'الأمان والتدقيق'],
   ['/system/recovery', '↺', 'النسخ والاسترجاع'],
   ['/system/data', '🧰', 'مدير البيانات'],
