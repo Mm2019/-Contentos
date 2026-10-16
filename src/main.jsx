@@ -25,6 +25,7 @@ import Commerce from './pages/Commerce'
 import Marketplace from './pages/Marketplace'
 import GlobalIntelligence from './pages/GlobalIntelligence'
 import SecurityAudit from './pages/SecurityAudit'
+import GeneralSettings from './pages/GeneralSettings'
 import VersioningRecovery from './pages/VersioningRecovery'
 import DataManager from './pages/DataManager'
 import Knowledge from './pages/Knowledge'
@@ -98,6 +99,7 @@ function App() {
               <Route path="/projects/:id/commerce" element={<Commerce />} />
               <Route path="/marketplace" element={<Marketplace />} />
               <Route path="/intelligence" element={<GlobalIntelligence />} />
+              <Route path="/settings" element={<GeneralSettings />} />
               <Route path="/system/security" element={<SecurityAudit />} />
               <Route path="/system/recovery" element={<VersioningRecovery />} />
               <Route path="/system/data" element={<DataManager />} />
