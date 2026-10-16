@@ -29,10 +29,8 @@ export default function SecurityAudit() {
         ? (await supabase.rpc('uos_security_context', { p_workspace: workspace.id })).data
         : { workspaceId: workspace.id, role:'local', canRead:true, canWrite:true, canDelete:true, canManage:false, canViewFinance:true, canEditFinance:true, canExportFinance:false, canViewAudit:false }
       setContext(nextContext)
-      const [m,p] = await Promise.all([
-        listEntities('uos_projects', workspace.id),
-      ])
-      setMembers(m); setProjects(p)
+      const p = await listEntities('uos_projects', workspace.id)
+      setProjects(p)
       if (selectedProject) setProjectMembers(await listEntities('uos_project_members', workspace.id))
       else setProjectMembers(await listEntities('uos_project_members', workspace.id))
       if (nextContext?.canViewAudit) setAudit(await listEntities('uos_audit_log', workspace.id, 'created_at'))
